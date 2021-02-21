@@ -26,6 +26,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once $CFG->dirroot.'/mod/quiz/report/overview/overview_table.php';
 require_once $CFG->libdir.'/phpexcel/PHPExcel.php';
+require_once __DIR__.'/excellib.php';
 
 // Related classes
 // https://github.com/moodle/moodle/blob/master/mod/quiz/report/overview/overview_table.php
@@ -119,66 +120,10 @@ class quiz_overview_sptable extends quiz_overview_table {
         //echo '<pre>'; var_dump($q_array); echo '</pre>';
         //echo '<pre>'; var_dump($sorted_rows); echo '</pre>'; die();
 
-        // Prepare to export Excel file
-        $book = new PHPExcel;
-        $sheet = $book->getActiveSheet();
-
-        // Define variables
-        define('POSITION_HEADER_ROW', 1);
-
-        $thin_black_bottom_bordered_cell = [
-            'borders' => [
-                'bottom' => [
-                    'style' => PHPExcel_Style_Border::BORDER_THIN,
-                    'color' => ['rgb' => '000000']
-                ]
-            ]
-        ];
-
-        $thin_black_left_bordered_cell = [
-            'borders' => [
-                'left' => [
-                    'style' => PHPExcel_Style_Border::BORDER_THIN,
-                    'color' => ['rgb' => '000000']
-                ]
-            ]
-        ];
-
-        $thin_red_top_bordered_cell = [
-            'borders' => [
-                'top' => [
-                    'style' => PHPExcel_Style_Border::BORDER_THIN,
-                    'color' => ['rgb' => 'FF0000']
-                ]
-            ]
-        ];
-
-        $thin_red_left_bordered_cell = [
-            'borders' => [
-                'left' => [
-                    'style' => PHPExcel_Style_Border::BORDER_THIN,
-                    'color' => ['rgb' => 'FF0000']
-                ]
-            ]
-        ];
-
-        $dashdot_blue_bottom_bordered_cell = [
-            'borders' => [
-                'bottom' => [
-                    'style' => PHPExcel_Style_Border::BORDER_DASHDOT,
-                    'color' => ['rgb' => '0000FF']
-                ]
-            ]
-        ];
-
-        $dashdot_blue_left_bordered_cell = [
-            'borders' => [
-                'left' => [
-                    'style' => PHPExcel_Style_Border::BORDER_DASHDOT,
-                    'color' => ['rgb' => '0000FF']
-                ]
-            ]
-        ];
+        // Export
+        $filename = 'sptable_' . strip_tags($this->quiz->name).'.xlsx';
+        $workbook = new MoodleExcelWorkbookSP($filename);
+        $sptablesheet = $workbook->add_worksheet('sptable');
 
         $user_attributes = [
             'fullname',
@@ -186,39 +131,40 @@ class quiz_overview_sptable extends quiz_overview_table {
         ];
 
         // Add sheet header
-        for ($i=0; $i<=count($user_attributes); $i++) {
-            $sheet->setCellValueByColumnAndRow($i, POSITION_HEADER_ROW, get_string($user_attributes[$i]))
-                ->getStyleByColumnAndRow($i, POSITION_HEADER_ROW)
-                ->applyFromArray($thin_black_bottom_bordered_cell);
+        // Print user attribute
+        for ($i=0; $i<count($user_attributes); $i++) {
+            $colpos = $i;
+            $sptablesheet->write_string(0, $colpos, get_string($user_attributes[$i]));
+            $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
         }
+        $sptablesheet->draw_line(0, count($user_attributes), 'left', 'thin', '000000');
 
+        // Print question number
         foreach ($q_order as $key=>$value) {
-            $sheet->setCellValueByColumnAndRow(count($user_attributes) + $key, POSITION_HEADER_ROW, "Q{$value}")
-                ->getStyleByColumnAndRow($key + count($user_attributes), POSITION_HEADER_ROW)
-                ->applyFromArray($thin_black_bottom_bordered_cell);
+            $colpos = count($user_attributes) + $key;
+            $sptablesheet->write_string(0, $colpos, "Q{$value}");
+            $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
         }
 
-        $sheet->setCellValueByColumnAndRow(count($user_attributes) + $key + 2, POSITION_HEADER_ROW, get_string('score', 'gradereport_sptable'))
-            ->getStyleByColumnAndRow(count($user_attributes) + $key +2, POSITION_HEADER_ROW)
-            ->applyFromArray($thin_black_bottom_bordered_cell);
+        // Print total score header
+        $colpos = count($user_attributes) + count($q_order) + 1;
+        $sptablesheet->write_string(0, $colpos, get_string('score', 'gradereport_sptable'));
+        $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
 
-        $sheet->setCellValueByColumnAndRow(count($user_attributes) + $key + 3, POSITION_HEADER_ROW, get_string('accuracy', 'gradereport_sptable'))
-            ->getStyleByColumnAndRow(count($user_attributes) + $key +3, POSITION_HEADER_ROW)
-            ->applyFromArray($thin_black_bottom_bordered_cell);
-
-        $sheet->getStyleByColumnAndRow(count($user_attributes), POSITION_HEADER_ROW)
-            ->applyFromArray($thin_black_left_bordered_cell);
+        // Print accuracy header
+        $colpos = count($user_attributes) + count($q_order) + 2;
+        $sptablesheet->write_string(0, $colpos, get_string('accuracy', 'gradereport_sptable'));
+        $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
 
         $prev_score = 0;
         foreach ($sorted_rows as $row_number=>$row) {
+            // Print user info
             $user = core_user::get_user($row['userid']);
-
             foreach ($user_attributes as $key=>$attribute) {
                 $cell_value = ($attribute === 'fullname') ? fullname($user) : $user->{$attribute};
-                $sheet->setCellValueByColumnAndRow($key, $row_number + 2, $cell_value);
+                $sptablesheet->write_string($row_number + 1, $key, $cell_value);
             }
-            $sheet->getStyleByColumnAndRow(count($user_attributes), $row_number + 2)
-                ->applyFromArray($thin_black_left_bordered_cell);
+            $sptablesheet->draw_line($row_number + 1, count($user_attributes), 'left', 'thin', '000000');
 
             // Fill question score
             $col_number = 0;
@@ -229,60 +175,57 @@ class quiz_overview_sptable extends quiz_overview_table {
 
                 $slot = substr($key, 7);
                 $score = (int) floor($value / 100);
-                $sheet->setCellValueByColumnAndRow($col_number + count($user_attributes), $row_number + 2, $score);
+                $colpos = count($user_attributes) + $col_number;
+                $sptablesheet->write_string($row_number + 1, $colpos, $score);
                 $col_number++;
             }
 
             // Fill user total score
-            $sheet->setCellValueByColumnAndRow($col_number + count($user_attributes) + 1, $row_number + 2, $row['score']);
+            $sptablesheet->write_string($row_number + 1, $col_number + count($user_attributes) + 1, $row['score']);
 
             // Fill user average score
-            $sheet->setCellValueByColumnAndRow($col_number + count($user_attributes) + 2, $row_number + 2,
+            $sptablesheet->write_string($row_number + 1, $col_number + count($user_attributes) + 2,
                 sprintf('%0.2f', $row['score']/count($q_array)));
 
-            // Draw score line
-            $sheet->getStyleByColumnAndRow($row['score'] + count($user_attributes), $row_number + 2)
-                ->applyFromArray($thin_red_left_bordered_cell);
-
+            // Draw student-score line
+            $sptablesheet->draw_line($row_number + 1, $row['score'] + count($user_attributes), 'left', 'thin', 'FF0000');
             if ($prev_score > $row['score']) {
                 for ($i=$prev_score; $i>$row['score']; $i--) {
-                    $sheet->getStyleByColumnAndRow($i + count($user_attributes) - 1, $row_number + 2)
-                        ->applyFromArray($thin_red_top_bordered_cell);
+                    $colpos = $i + count($user_attributes) - 1;
+                    $sptablesheet->draw_line($row_number + 1, $colpos, 'top', 'thin', 'FF0000');
                 }
             }
             $prev_score = $row['score'];
         }
 
         // Fill question total score
-        $sheet->setCellValueByColumnAndRow(count($user_attributes) - 1, $row_number + 4, get_string('rightanswers', 'gradereport_sptable'));
-        $sheet->setCellValueByColumnAndRow(count($user_attributes) - 1, $row_number + 5, get_string('accuracy', 'gradereport_sptable'));
+        $sptablesheet->write_string($row_number + 3, count($user_attributes) - 1, get_string('rightanswers', 'gradereport_sptable'));
+        $sptablesheet->draw_line($row_number + 3, count($user_attributes), 'left', 'thin', '000000');
+        $sptablesheet->write_string($row_number + 4, count($user_attributes) - 1, get_string('accuracy', 'gradereport_sptable'));
+        $sptablesheet->draw_line($row_number + 4, count($user_attributes), 'left', 'thin', '000000');
+
         $col_counter = 0;
         foreach ($q_array as $score) {
-            $sheet->setCellValueByColumnAndRow(count($user_attributes) + $col_counter, $row_number + 4, $score);
-            // Fill user average score
-            $sheet->setCellValueByColumnAndRow(count($user_attributes) + $col_counter, $row_number + 5,
-                sprintf('%0.2f', $score/count($u_array)));
+            $colpos = count($user_attributes) + $col_counter;
+
+            // Fill user / average score
+            $sptablesheet->write_string($row_number + 3, $colpos, $score);
+            $sptablesheet->write_string($row_number + 4, $colpos, sprintf('%0.2f', $score/count($u_array)));
 
             $col_counter++;
         }
-        $sheet->setCellValueByColumnAndRow(count($user_attributes) + $col_counter + 1, $row_number + 4, array_sum($q_array))
-            ->getStyleByColumnAndRow(count($user_attributes), $row_number + 4)
-            ->applyFromArray($thin_black_left_bordered_cell);
 
-        $sheet->getStyleByColumnAndRow(count($user_attributes), $row_number + 5)
-            ->applyFromArray($thin_black_left_bordered_cell);
+        $colpos = count($user_attributes) + $col_counter + 1;
+        $sptablesheet->write_string($row_number + 3, $colpos, array_sum($q_array));
 
-        // Draw problem line
+        // Draw problem-score line
         $prev_score = null;
         $col_counter = 0;
         foreach ($q_array as $score) {
-            $sheet->getStyleByColumnAndRow(count($user_attributes) + $col_counter, $score + 1)
-                ->applyFromArray($dashdot_blue_bottom_bordered_cell);
-
+            $sptablesheet->draw_line($score, count($user_attributes) + $col_counter, 'bottom', 'dashDot', '0000FF');
             if (!is_null($prev_score) && $prev_score > $score) {
                 for ($i=$prev_score; $i>$score; $i--) {
-                    $sheet->getStyleByColumnAndRow(count($user_attributes) + $col_counter , $i + 1)
-                        ->applyFromArray($dashdot_blue_left_bordered_cell);
+                    $sptablesheet->draw_line($i + 1, count($user_attributes) + $col_counter, 'left', 'dashDot', '0000FF');
                 }
             }
 
@@ -291,10 +234,11 @@ class quiz_overview_sptable extends quiz_overview_table {
         }
 
         // Add Student Attention Score (attention_score = (param_a - param_b)/(param_c - param_d * param_e))
-        $col_position = count($q_array) + 3 + count($user_attributes);
-        $sheet->setCellValueByColumnAndRow($col_position, POSITION_HEADER_ROW, get_string('cautionscore', 'gradereport_sptable'))
-            ->getStyleByColumnAndRow($col_position, POSITION_HEADER_ROW)
-            ->applyFromArray($thin_black_bottom_bordered_cell);
+        $colpos = count($user_attributes) + count($q_array) + 3;
+
+        $sptablesheet->write_string(0, $colpos, get_string('cautionscore', 'gradereport_sptable'));
+        $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
+
         foreach ($sorted_rows as $row_number=>$row) {
             $s_position = $row['score'];
 
@@ -323,15 +267,15 @@ class quiz_overview_sptable extends quiz_overview_table {
 
             $attention_score = ($param_a - $param_b) / ($param_c - $param_d*$param_e);
             $attention_score = sprintf('%0.2f', $attention_score);
-            $sheet->setCellValueByColumnAndRow($col_position, $row_number + 2, $attention_score);
+            $sptablesheet->write_string($row_number + 1, $colpos, $attention_score);
         }
 
         // Add Question Attention Score (attention_score = (param_a - param_b)/(param_c - param_d * param_e))
-        $row_position = count($u_array) + 5;
-        $col_position = count($user_attributes);
-        $sheet->setCellValueByColumnAndRow($col_position - 1, $row_position, get_string('cautionpoint', 'gradereport_sptable'))
-            ->getStyleByColumnAndRow($col_position, $row_position)
-            ->applyFromArray($thin_black_left_bordered_cell);
+        $rowpos = count($u_array) + 4;
+        $colpos = count($user_attributes);
+        $sptablesheet->write_string($rowpos, $colpos - 1, get_string('cautionpoint', 'gradereport_sptable'));
+        $sptablesheet->draw_line($rowpos, $colpos, 'left', 'thin', '000000');
+
         foreach ($q_array as $q_key=>$q_score) {
             $q_position = $q_score;
 
@@ -343,9 +287,6 @@ class quiz_overview_sptable extends quiz_overview_table {
 
             $counter = 0;
             foreach ($sorted_rows as $row) {
-
-            //echo '<pre>'; var_dump($counter); echo '</pre>';
-
                 if ($counter < $q_position && $row['qsgrade'.$q_key] !== 100) {
                     $param_a += $row['score'];
                  }
@@ -363,17 +304,12 @@ class quiz_overview_sptable extends quiz_overview_table {
 
             $attention_score = ($param_a - $param_b) / ($param_c - $param_d*$param_e);
             $attention_score = sprintf('%0.2f', $attention_score);
-            $sheet->setCellValueByColumnAndRow($col_position, $row_position, $attention_score);
-            $col_position++;
+            $sptablesheet->write_string($rowpos, $colpos, $attention_score);
+            $colpos++;
         }
 
         // Download Excel file
-        $filename = 'sptable_' . strip_tags($this->quiz->name);
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment;filename="' . $filename . '.xlsx"');
-        header('Cache-Control: max-age=0');
-        $writer = PHPExcel_IOFactory::createWriter($book, 'Excel2007');
-        $writer->save('php://output');
+        $workbook->close();
         die();
     }
 
