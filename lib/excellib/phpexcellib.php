@@ -17,14 +17,14 @@
 /**
  * Excel writer abstraction layer.
  *
- * @copyright
- * @license
+ * @copyright   infinitail
  * @package     gradereport_sptable
  */
 
 defined('MOODLE_INTERNAL') || die();
 require_once $CFG->libdir.'/excellib.class.php';
 
+// https://github.com/moodle/moodle/blob/MOODLE_35_STABLE/lib/excellib.class.php
 class MoodleExcelWorkbookSP extends MoodleExcelWorkbook {
     public function add_worksheet($name = '') {
         return new MoodleExcelWorksheetSP($name, $this->objPHPExcel);
@@ -32,7 +32,19 @@ class MoodleExcelWorkbookSP extends MoodleExcelWorkbook {
 }
 
 class MoodleExcelWorksheetSP extends MoodleExcelWorksheet {
-    public function draw_line($row, $col, $pos, $style='thin', $color='000000') {
+    /**
+     * Draw cell border line
+     *
+     * @param int $row      - target row number
+     * @param int $col      - target col number
+     * @param string $pos   - border postion [top, bottom, left, right]
+     * @param string $style - border line style
+     *      [none, dashDot, dashDotDot, dashed, dotted, double, hair, medium,
+     *      mediumDashDot, mediumDashDotDot, mediumDashed, slantDashDot, thick, thin]
+     * @param string $color - RGB color code
+     * @return void
+     */
+    public function draw_cell_border($row, $col, $pos, $style='thin', $color='000000') {
         $this->worksheet
             ->getStyleByColumnAndRow($col, $row+1)
             ->applyFromArray([

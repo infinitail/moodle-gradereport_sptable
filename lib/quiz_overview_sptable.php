@@ -135,26 +135,26 @@ class quiz_overview_sptable extends quiz_overview_table {
         for ($i=0; $i<count($user_attributes); $i++) {
             $colpos = $i;
             $sptablesheet->write_string(0, $colpos, get_string($user_attributes[$i]));
-            $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
+            $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
         }
-        $sptablesheet->draw_line(0, count($user_attributes), 'left', 'thin', '000000');
+        $sptablesheet->draw_cell_border(0, count($user_attributes), 'left', 'thin', '000000');
 
         // Print question number
         foreach ($q_order as $key=>$value) {
             $colpos = count($user_attributes) + $key;
             $sptablesheet->write_string(0, $colpos, "Q{$value}");
-            $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
+            $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
         }
 
         // Print total score header
         $colpos = count($user_attributes) + count($q_order) + 1;
         $sptablesheet->write_string(0, $colpos, get_string('score', 'gradereport_sptable'));
-        $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
+        $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
 
         // Print accuracy header
         $colpos = count($user_attributes) + count($q_order) + 2;
         $sptablesheet->write_string(0, $colpos, get_string('accuracy', 'gradereport_sptable'));
-        $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
+        $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
 
         $prev_score = 0;
         foreach ($sorted_rows as $row_number=>$row) {
@@ -164,7 +164,7 @@ class quiz_overview_sptable extends quiz_overview_table {
                 $cell_value = ($attribute === 'fullname') ? fullname($user) : $user->{$attribute};
                 $sptablesheet->write_string($row_number + 1, $key, $cell_value);
             }
-            $sptablesheet->draw_line($row_number + 1, count($user_attributes), 'left', 'thin', '000000');
+            $sptablesheet->draw_cell_border($row_number + 1, count($user_attributes), 'left', 'thin', '000000');
 
             // Fill question score
             $col_number = 0;
@@ -188,11 +188,11 @@ class quiz_overview_sptable extends quiz_overview_table {
                 sprintf('%0.2f', $row['score']/count($q_array)));
 
             // Draw student-score line
-            $sptablesheet->draw_line($row_number + 1, $row['score'] + count($user_attributes), 'left', 'thin', 'FF0000');
+            $sptablesheet->draw_cell_border($row_number + 1, $row['score'] + count($user_attributes), 'left', 'thin', 'FF0000');
             if ($prev_score > $row['score']) {
                 for ($i=$prev_score; $i>$row['score']; $i--) {
                     $colpos = $i + count($user_attributes) - 1;
-                    $sptablesheet->draw_line($row_number + 1, $colpos, 'top', 'thin', 'FF0000');
+                    $sptablesheet->draw_cell_border($row_number + 1, $colpos, 'top', 'thin', 'FF0000');
                 }
             }
             $prev_score = $row['score'];
@@ -200,9 +200,9 @@ class quiz_overview_sptable extends quiz_overview_table {
 
         // Fill question total score
         $sptablesheet->write_string($row_number + 3, count($user_attributes) - 1, get_string('rightanswers', 'gradereport_sptable'));
-        $sptablesheet->draw_line($row_number + 3, count($user_attributes), 'left', 'thin', '000000');
+        $sptablesheet->draw_cell_border($row_number + 3, count($user_attributes), 'left', 'thin', '000000');
         $sptablesheet->write_string($row_number + 4, count($user_attributes) - 1, get_string('accuracy', 'gradereport_sptable'));
-        $sptablesheet->draw_line($row_number + 4, count($user_attributes), 'left', 'thin', '000000');
+        $sptablesheet->draw_cell_border($row_number + 4, count($user_attributes), 'left', 'thin', '000000');
 
         $col_counter = 0;
         foreach ($q_array as $score) {
@@ -222,10 +222,10 @@ class quiz_overview_sptable extends quiz_overview_table {
         $prev_score = null;
         $col_counter = 0;
         foreach ($q_array as $score) {
-            $sptablesheet->draw_line($score, count($user_attributes) + $col_counter, 'bottom', 'dashDot', '0000FF');
+            $sptablesheet->draw_cell_border($score, count($user_attributes) + $col_counter, 'bottom', 'dashDot', '0000FF');
             if (!is_null($prev_score) && $prev_score > $score) {
                 for ($i=$prev_score; $i>$score; $i--) {
-                    $sptablesheet->draw_line($i + 1, count($user_attributes) + $col_counter, 'left', 'dashDot', '0000FF');
+                    $sptablesheet->draw_cell_border($i + 1, count($user_attributes) + $col_counter, 'left', 'dashDot', '0000FF');
                 }
             }
 
@@ -237,7 +237,7 @@ class quiz_overview_sptable extends quiz_overview_table {
         $colpos = count($user_attributes) + count($q_array) + 3;
 
         $sptablesheet->write_string(0, $colpos, get_string('cautionscore', 'gradereport_sptable'));
-        $sptablesheet->draw_line(0, $colpos, 'bottom', 'thin', '000000');
+        $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
 
         foreach ($sorted_rows as $row_number=>$row) {
             $s_position = $row['score'];
@@ -252,7 +252,7 @@ class quiz_overview_sptable extends quiz_overview_table {
             foreach ($q_array as $q_key=>$q_score) {
                 if ($counter < $s_position && $row['qsgrade'.$q_key] !== 100) {
                     $param_a += $q_score;
-                 }
+                }
 
                 if ($counter >= $s_position && $row['qsgrade'.$q_key] === 100) {
                     $param_b += $q_score;
@@ -274,7 +274,7 @@ class quiz_overview_sptable extends quiz_overview_table {
         $rowpos = count($u_array) + 4;
         $colpos = count($user_attributes);
         $sptablesheet->write_string($rowpos, $colpos - 1, get_string('cautionpoint', 'gradereport_sptable'));
-        $sptablesheet->draw_line($rowpos, $colpos, 'left', 'thin', '000000');
+        $sptablesheet->draw_cell_border($rowpos, $colpos, 'left', 'thin', '000000');
 
         foreach ($q_array as $q_key=>$q_score) {
             $q_position = $q_score;
@@ -289,7 +289,7 @@ class quiz_overview_sptable extends quiz_overview_table {
             foreach ($sorted_rows as $row) {
                 if ($counter < $q_position && $row['qsgrade'.$q_key] !== 100) {
                     $param_a += $row['score'];
-                 }
+                }
 
                 if ($counter >= $q_position && $row['qsgrade'.$q_key] === 100) {
                     $param_b += $row['score'];
