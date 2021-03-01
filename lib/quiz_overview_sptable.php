@@ -25,7 +25,6 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once $CFG->dirroot.'/mod/quiz/report/overview/overview_table.php';
-require_once $CFG->libdir.'/phpexcel/PHPExcel.php';
 require_once __DIR__.'/excellib.php';
 
 // Related classes
