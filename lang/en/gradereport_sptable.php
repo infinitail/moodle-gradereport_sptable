@@ -28,3 +28,6 @@ $string['rightanswers'] = 'Right Answers';
 $string['cautionscore'] = 'C.S.';
 $string['cautionpoint'] = 'C.P.';
 $string['accuracy'] = 'Accuracy';
+$string['userattributes'] = 'User Attributes';
+$string['userattributesdesc'] = 'Display user attributes describe below in Excel table<br />
+username, fullname, firstname, lastname, idnumber, institution, department';

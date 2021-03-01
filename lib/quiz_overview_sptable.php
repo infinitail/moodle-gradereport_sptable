@@ -124,10 +124,20 @@ class quiz_overview_sptable extends quiz_overview_table {
         $workbook = new MoodleExcelWorkbookSP($filename);
         $sptablesheet = $workbook->add_worksheet('sptable');
 
-        $user_attributes = [
+        $allowed_user_attributes = [
+            'username',
             'fullname',
+            'firstname',
+            'lastname',
             'idnumber',
+            'institution',
+            'department',
         ];
+
+        $user_attributes = get_config('gradereport_sptable', 'user_attributes');
+        $user_attributes = explode(' ', $user_attributes);
+        $user_attributes = array_intersect($user_attributes, $allowed_user_attributes);     // filter allowed attributes
+        $user_attributes = array_values($user_attributes);                                  // remove empty element
 
         // Add sheet header
         // Print user attribute
@@ -224,7 +234,7 @@ class quiz_overview_sptable extends quiz_overview_table {
             $sptablesheet->draw_cell_border($score, count($user_attributes) + $col_counter, 'bottom', 'dashDot', '0000FF');
             if (!is_null($prev_score) && $prev_score > $score) {
                 for ($i=$prev_score; $i>$score; $i--) {
-                    $sptablesheet->draw_cell_border($i + 1, count($user_attributes) + $col_counter, 'left', 'dashDot', '0000FF');
+                    $sptablesheet->draw_cell_border($i, count($user_attributes) + $col_counter, 'left', 'dashDot', '0000FF');
                 }
             }
 
@@ -264,7 +274,7 @@ class quiz_overview_sptable extends quiz_overview_table {
                 $counter++;
             }
 
-            $attention_score = ($param_a - $param_b) / ($param_c - $param_d*$param_e);
+            $attention_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
             $attention_score = sprintf('%0.2f', $attention_score);
             $sptablesheet->write_string($row_number + 1, $colpos, $attention_score);
         }
@@ -301,7 +311,7 @@ class quiz_overview_sptable extends quiz_overview_table {
                 $counter++;
             }
 
-            $attention_score = ($param_a - $param_b) / ($param_c - $param_d*$param_e);
+            $attention_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
             $attention_score = sprintf('%0.2f', $attention_score);
             $sptablesheet->write_string($rowpos, $colpos, $attention_score);
             $colpos++;
@@ -359,9 +369,7 @@ class quiz_overview_sptable extends quiz_overview_table {
                 $grade = '-';
             }
         } else {
-            //$grade = $stepdata->fraction;       // Return percentage instead of real score
-            $grade = quiz_rescale_grade(
-                    $stepdata->fraction * $question->maxmark, $this->quiz, 'question');
+            $grade = $stepdata->fraction;       // Return percentage instead of real score
         }
 
         return $grade;
