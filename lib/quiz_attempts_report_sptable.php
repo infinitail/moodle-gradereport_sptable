@@ -49,7 +49,7 @@ class quiz_attempts_report_sptable extends quiz_attempts_report {
         //$options->process_settings_from_params();
         $options->pagesize = PHP_INT_MAX;   // Set "unlimited"
         $options->onlygraded = 1;
-        //var_dump($options);
+        $options->states = ['finished'];    // ignore "inprogress", "overdue", "abandoned"
 
         $this->form->set_data($options->get_initial_form_data());
 
