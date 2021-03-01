@@ -15,19 +15,21 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Strings
+ * Settings and links
  *
- * @package    gradereport_sptable
- * @author     infinitail
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package     gradereport_sptable
+ * @copyright   infinitail
+ * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['pluginname'] = 'S-P表分析';
-$string['score'] = '得点';
-$string['rightanswers'] = '正解数';
-$string['cautionscore'] = 'C.S.';
-$string['cautionpoint'] = 'C.P.';
-$string['accuracy'] = '正答率';
-$string['userattributes'] = 'ユーザ属性';
-$string['userattributesdesc'] = '空白で区切られた下記のユーザ属性をExcel出力時に記載します。<br />
-username, fullname, firstname, lastname, idnumber, institution, department';
+defined('MOODLE_INTERNAL') || die;
+
+if ($ADMIN->fulltree) {
+    $settings->add(new admin_setting_configtext(
+        'gradereport_sptable/user_attributes',
+        get_string('userattributes', 'gradereport_sptable'),
+        get_string('userattributesdesc', 'gradereport_sptable'),
+        'fullname idnumber',
+        PARAM_CLEAN
+    ));
+}
