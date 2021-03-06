@@ -27,42 +27,59 @@ require_once $CFG->libdir.'/gradelib.php';
 require_once $CFG->libdir.'/tablelib.php';
 require_once $CFG->dirroot.'/grade/lib.php';
 require_once __DIR__.'/lib.php';
+require_once $CFG->dirroot.'/mod/quiz/report/reportlib.php';
 
-$id  = required_param('id', PARAM_INT);     // course id
+$courseid = required_param('id', PARAM_INT);
 
-if (!$course = $DB->get_record('course', ['id'=>$id])) {
+if (!$course = $DB->get_record('course', ['id'=>$courseid])) {
     print_error('invalidcourseid');
 }
 
-require_login();
+require_login($course);
 $coursecontext = context_course::instance($course->id);
 require_capability('gradereport/sptable:view', $coursecontext);
-//require_capability('moodle/grade:viewall', $coursecontext);
 
-// Return tracking object
-$gpr = new grade_plugin_return(['type'=>'report', 'plugin'=>'sptable', 'courseid'=>$course->id]);
-$returnurl = $gpr->get_return_url(null);
-
-//$PAGE->set_pagelayout('report');
-$PAGE->set_pagelayout('admin');
-$PAGE->set_url(new moodle_url('/report/sptable/index.php'), ['cid'=>$course->id]);
-$PAGE->set_title(format_string($course->shortname, true, ['context' => $coursecontext]));
-$PAGE->set_heading(format_string($course->fullname, true, ['context' => $coursecontext]));
+$PAGE->set_url(new moodle_url('/grade/report/sptable/index.php'), ['id'=>$course->id]);
 
 // Print header menu
 // /grade/<type>/<plugin>/index.php?id=2
 // type: ['report', 'edit', 'import', 'export']
-print_grade_page_head($course->id, 'report', 'sptable', get_string('gradebooksetup', 'grades'));
+print_grade_page_head($course->id, 'report', 'sptable');
 
 // Print Table of categories and items
-echo $OUTPUT->box_start('gradetreebox generalbox');
-$report = new grade_report_sptable($course->id, $gpr, $coursecontext);
-echo $OUTPUT->box_end();
+$gpr = new grade_plugin_return(['type'=>'report', 'plugin'=>'sptable', 'courseid'=>$course->id]);
+$gtree = new grade_tree($course->id, false, false);
 
+$tbody = [];
+$modinfo = $gtree->modinfo;
+$cminstances = $modinfo->get_instances_of('quiz');
 
-//echo $OUTPUT->box_start('generalbox', 'notice');
-//echo html_writer::label(get_string('withselectedusers'), 'formactionid');
-//$users = $DB->get_records_menu('user', null, null, 'id, username');
-//echo html_writer::select($users, 'name', '', ['' => 'choosedots'], ['id' => 'formactionid']);
-//echo $OUTPUT->box_end();
+$html  = '<table class="generaltable boxaligncenter" width="90%" cellspacing="1" cellpadding="5">';
+$html .= '<tr>';
+$html .= '<th class="header c0" scope="col">' . get_string('pluginname', 'quiz') . '</th>';
+$html .= '<th class="header c1" scope="col">' . get_string('questions', 'quiz') . '</th>';
+$html .= '<th class="header c3" scope="col">' . get_string('numberofgrades', 'grades') . '</th>';
+$html .= '</tr>';
+
+foreach ($gtree->items as $item) {
+    if ($item->itemmodule !== 'quiz') {
+        continue;
+    }
+
+    $quiz = $DB->get_record('quiz', ['id' => $item->iteminstance]);
+    $cm = $cminstances[$item->iteminstance];
+    $url = new moodle_url("/grade/report/sptable/export.php?cmid={$cm->id}");
+
+    $html .= '<tr>';
+    $html .= html_writer::tag('td', html_writer::link($url, $item->itemname));
+    //$html .= '<td>' . quiz_has_grades($quiz) . '</td>';
+    $html .= html_writer::tag('td', count(quiz_report_get_significant_questions($quiz)));
+    $html .= html_writer::tag('td', count(quiz_get_user_grades($quiz)));
+    $html .= '</tr>';
+}
+
+$html .= '</table>';
+
+echo $html;
+
 echo $OUTPUT->footer();

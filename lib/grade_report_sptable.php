@@ -22,6 +22,11 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+/**
+ * This is deprecated class
+ * but do not remove for system stablility
+ */
+
 defined('MOODLE_INTERNAL') || die();
 
 require_once $CFG->libdir.'/tablelib.php';
