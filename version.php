@@ -23,7 +23,7 @@
 defined('MOODLE_INTERNAL') || die;
 
 $plugin->component = 'gradereport_sptable';     // Full name of the plugin (used for diagnostics).
-$plugin->version   = 2021030100;                // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2021030600;                // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires  = 2017111300;                // Requires this Moodle version. (Moodle 3.5 or higher)
 $plugin->maturity  = MATURITY_BETA;
-$plugin->release   = 'v0.2.';
+$plugin->release   = 'v0.3.0';
