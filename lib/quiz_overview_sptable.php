@@ -51,7 +51,7 @@ class quiz_overview_sptable extends quiz_overview_table {
         $this->close_recordset();
         //$this->finish_output();
 
-        //echo '<pre>'; var_dump($this->rawdata); echo '</pre>';
+        //echo '<pre>'; var_dump($this->rawdata); echo '</pre>';die();
         $score_rows = [];
         foreach ($this->rawdata as $row) {
             // Get Users and scores
@@ -81,7 +81,7 @@ class quiz_overview_sptable extends quiz_overview_table {
             }
         }
 
-        //echo '<pre>'; var_dump($score_matrix); echo '</pre>';
+        //echo '<pre>'; var_dump($score_matrix); echo '</pre>';die();
 
         // Create rate data for sorting
         $u_array = [];
@@ -98,20 +98,28 @@ class quiz_overview_sptable extends quiz_overview_table {
             }
         }
 
+        // ORDER BY Score, UserId.
+        $u_score = array_values($u_array);
+        $u_key   = array_keys($u_array);
+        array_multisort($u_score, SORT_DESC, SORT_NUMERIC, $u_key);
+        $u_order = $u_key;
+
+        // ORDER BY Score, Question No.
+        $q_score = array_values($q_array);
+        $q_key   = array_keys($q_array);
+        array_multisort($q_score, SORT_DESC, SORT_NUMERIC, $q_key);
+        $q_order = $q_key;
+
         arsort($u_array);
         arsort($q_array);
-        $u_order = array_keys($u_array);
-        $q_order = array_keys($q_array);
 
         $sorted_rows = [];
         foreach ($u_order as $u_id=>$u_key) {
             preg_match('/\/user\/view.php\?id=([0-9]+)&/', $score_rows[$u_key]['fullname'], $matches);
             $sorted_rows[$u_id]['userid'] = $matches[1];
-            //$sorted_rows[$u_id]['fullname'] = $score_rows[$u_key]['fullname'];
             $sorted_rows[$u_id]['score'] = $u_array[$u_key];
 
             foreach ($q_order as $q_id=>$q_key) {
-                //$sorted_rows[$u_id]['qsgrade'.$q_key] = $score_rows[$u_key]['qsgrade'.$q_key];
                 $sorted_rows[$u_id]['qsgrade'.$q_key] = $score_matrix[$u_key][$q_key];
             }
         }
