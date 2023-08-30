@@ -318,8 +318,12 @@ class quiz_overview_sptable extends quiz_overview_table {
 
                 $counter++;
             }
-
-            $attention_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
+            
+            if (($param_c - $param_d*$param_e) > 0) {
+                $attention_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
+            } else {
+                $attention_score = 0;
+            }
             $attention_score = sprintf('%0.2f', $attention_score);
             $sptablesheet->write_string($rowpos, $colpos, $attention_score);
             $colpos++;
