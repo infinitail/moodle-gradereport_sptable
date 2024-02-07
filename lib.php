@@ -22,6 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require_once __DIR__.'/lib/grade_report_sptable.php';           // Do not remove
+require_once __DIR__.'/lib/grade_report_sptable.php';
 require_once __DIR__.'/lib/quiz_attempts_report_sptable.php';
 require_once __DIR__.'/lib/quiz_overview_sptable.php';
+

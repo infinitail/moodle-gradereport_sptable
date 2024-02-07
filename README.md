@@ -3,7 +3,7 @@
 **moodle-gradereport_sptable** is Quiz report analysis plugin for Moodle based on "S-P表分析法(Student-Problem Score Table Analysis)" theory.
 
 ## requirement
-Moodle 3.5 ～ 
+Moodle 3.8 ～ 
 
 ## usage
 Go your couse and open "grade report" page, check "Student-Problem Score Table Analysis" tab.
