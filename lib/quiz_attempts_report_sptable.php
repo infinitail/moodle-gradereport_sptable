@@ -38,6 +38,8 @@ require_once __DIR__.'/quiz_overview_sptable.php';
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class quiz_attempts_report_sptable extends quiz_attempts_report {
+    public $course;
+
     // https://github.com/moodle/moodle/blob/master/mod/quiz/report/overview/report.php#L47
     public function display($quiz, $cm, $course) {
         global $DB, $OUTPUT, $PAGE;

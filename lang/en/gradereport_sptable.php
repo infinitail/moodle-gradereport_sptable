@@ -31,3 +31,10 @@ $string['accuracy'] = 'Accuracy';
 $string['userattributes'] = 'User Attributes';
 $string['userattributesdesc'] = 'Display user attributes describe below in Excel table<br />
 username, fullname, firstname, lastname, idnumber, institution, department';
+$string['numberstudent'] = 'Number Student';
+$string['numberquestion'] = 'Number Question';
+$string['answerrate'] = 'Answer Rate';
+$string['mindex'] = 'M index';
+$string['dbm'] = 'DBM';
+$string['dc'] = 'Deferece Coefficient';
+$string['dcexception'] = 'Deferece Coefficient calculation failed.';

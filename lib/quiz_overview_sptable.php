@@ -25,7 +25,23 @@
 defined('MOODLE_INTERNAL') || die();
 
 require_once $CFG->dirroot.'/mod/quiz/report/overview/overview_table.php';
-require_once __DIR__.'/excellib.php';
+require_once $CFG->dirroot.'/grade/report/sptable/locallib.php';
+require_once $CFG->dirroot.'/grade/report/sptable/lib/SpTable/DefereceCoefficient.php';
+
+use PhpOffice\PhpSpreadsheet\Chart\Layout;
+use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
+use PhpOffice\PhpSpreadsheet\Chart\Legend;
+use PhpOffice\PhpSpreadsheet\Chart\Title;
+use PhpOffice\PhpSpreadsheet\Chart\Chart;
+use PhpOffice\PhpSpreadsheet\Chart\Axis as ChartAxis;
+use PhpOffice\PhpSpreadsheet\Chart\ChartColor;
+use PhpOffice\PhpSpreadsheet\Chart\GridLines;
+use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
+use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
+use PhpOffice\PhpSpreadsheet\Chart\TrendLine;
+use PhpOffice\PhpSpreadsheet\Chart\Properties;
+use Grade\Report\SpTable as SpTable;
+use Grade\Report\SpTable\DefereceCoefficient;
 
 // Related classes
 // https://github.com/moodle/moodle/blob/master/mod/quiz/report/overview/overview_table.php
@@ -34,6 +50,16 @@ require_once __DIR__.'/excellib.php';
 // https://github.com/moodle/moodle/blob/master/lib/tablelib.php
 
 class quiz_overview_sptable extends quiz_overview_table {
+    public $allowed_user_attributes = [
+        'username',
+        'fullname',
+        'firstname',
+        'lastname',
+        'idnumber',
+        'institution',
+        'department',
+    ];
+
     public function out($pagesize, $useinitialsbar, $downloadhelpbutton='') {
         global $CFG, $DB;
         if (!$this->columns) {
@@ -124,67 +150,70 @@ class quiz_overview_sptable extends quiz_overview_table {
             }
         }
 
-        //echo '<pre>'; var_dump($q_array); echo '</pre>';
+        //echo '<pre>'; var_dump($q_array); echo '</pre>'; die();
         //echo '<pre>'; var_dump($sorted_rows); echo '</pre>'; die();
 
-        // Export
-        $filename = 'sptable_' . strip_tags($this->quiz->name).'.xlsx';
-        $workbook = new MoodleExcelWorkbookSP($filename);
-        $sptablesheet = $workbook->add_worksheet('sptable');
+        require_once $CFG->libdir.'/phpspreadsheet/vendor/autoload.php';
+        require_once __DIR__.'/SpreadSheet/WorkSheet.php';
+        $work_book =  new \PhpOffice\PhpSpreadsheet\Spreadsheet;
 
-        $allowed_user_attributes = [
-            'username',
-            'fullname',
-            'firstname',
-            'lastname',
-            'idnumber',
-            'institution',
-            'department',
-        ];
+        // Remove Default Sheet
+        $work_book->removeSheetByIndex(0);
+        $sheet_id = 0;
+
+        // Create S-P Table Sheet
+        $sptable_sheet = new \moodle\grade\report\sptable\Spreadsheet\WorkSheet($work_book, 'S-P Table');
+        $work_book->addSheet($sptable_sheet, $sheet_id);
 
         $user_attributes = get_config('gradereport_sptable', 'user_attributes');
         $user_attributes = explode(' ', $user_attributes);
-        $user_attributes = array_intersect($user_attributes, $allowed_user_attributes);     // filter allowed attributes
-        $user_attributes = array_values($user_attributes);                                  // remove empty element
-
+        $user_attributes = array_intersect($user_attributes, $this->allowed_user_attributes);   // filter allowed attributes
+        $user_attributes = array_values($user_attributes);                                      // remove empty element
+        
         // Add sheet header
-        // Print user attribute
-        for ($i=0; $i<count($user_attributes); $i++) {
-            $colpos = $i;
-            $sptablesheet->write_string(0, $colpos, get_string($user_attributes[$i]));
-            $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
+        // Print user attributes
+        $row_pos = 1;
+        $col_pos = 1;
+        foreach ($user_attributes as $user_attribute) {
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string($user_attribute));
+            $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+            $col_pos++;
         }
-        $sptablesheet->draw_cell_border(0, count($user_attributes), 'left', 'thin', '000000');
+        $sptable_sheet->drawCellBorder(count($user_attributes), $row_pos, 'right', 'thin', '000000');
 
         // Print question number
         foreach ($q_order as $key=>$value) {
-            $colpos = count($user_attributes) + $key;
-            $sptablesheet->write_string(0, $colpos, "Q{$value}");
-            $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
+            $col_pos = count($user_attributes) + 1 + $key;
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, "Q{$value}");
+            $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
         }
 
         // Print total score header
-        $colpos = count($user_attributes) + count($q_order) + 1;
-        $sptablesheet->write_string(0, $colpos, get_string('score', 'gradereport_sptable'));
-        $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
+        $col_pos = count($user_attributes) + count($q_order) + 2;
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos,get_string('score', 'gradereport_sptable'));
+        $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
 
         // Print accuracy header
-        $colpos = count($user_attributes) + count($q_order) + 2;
-        $sptablesheet->write_string(0, $colpos, get_string('accuracy', 'gradereport_sptable'));
-        $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
-
+        $col_pos = count($user_attributes) + count($q_order) + 3;
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('accuracy', 'gradereport_sptable'));
+        $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+        
         $prev_score = 0;
-        foreach ($sorted_rows as $row_number=>$row) {
+        foreach ($sorted_rows as $row_key=>$row) {
+            $row_pos = $row_key + 2;
+            $col_pos = 1;
+
             // Print user info
             $user = core_user::get_user($row['userid']);
-            foreach ($user_attributes as $key=>$attribute) {
+            foreach ($user_attributes as $attribute) {
                 $cell_value = ($attribute === 'fullname') ? fullname($user) : $user->{$attribute};
-                $sptablesheet->write_string($row_number + 1, $key, $cell_value);
+                $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, $cell_value);
+                $col_pos++;
             }
-            $sptablesheet->draw_cell_border($row_number + 1, count($user_attributes), 'left', 'thin', '000000');
+            $sptable_sheet->drawCellBorder(count($user_attributes), $row_pos, 'right', 'thin', '000000');
 
             // Fill question score
-            $col_number = 0;
+            //$col_pos = count($user_attributes) + 3;
             foreach ($row as $key=>$value) {
                 if (substr($key, 0, 7) !== 'qsgrade') {
                     continue;
@@ -192,71 +221,74 @@ class quiz_overview_sptable extends quiz_overview_table {
 
                 $slot = substr($key, 7);
                 $score = (int) floor($value / 100);
-                $colpos = count($user_attributes) + $col_number;
-                $sptablesheet->write_string($row_number + 1, $colpos, $score);
-                $col_number++;
+                $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, $score);
+                $col_pos++;
             }
 
             // Fill user total score
-            $sptablesheet->write_string($row_number + 1, $col_number + count($user_attributes) + 1, $row['score']);
+            $col_pos++;
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, $row['score']);
+            $col_pos++;
 
             // Fill user average score
-            $sptablesheet->write_string($row_number + 1, $col_number + count($user_attributes) + 2,
-                sprintf('%0.2f', $row['score']/count($q_array)));
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, sprintf('%0.2f', $row['score']/count($q_array)));
 
-            // Draw student-score line
-            $sptablesheet->draw_cell_border($row_number + 1, $row['score'] + count($user_attributes), 'left', 'thin', 'FF0000');
+            // Draw student-score line (RED)
+            $sptable_sheet->drawCellBorder($row['score'] + count($user_attributes) + 1, $row_pos, 'left', 'thin', 'FF0000');
             if ($prev_score > $row['score']) {
                 for ($i=$prev_score; $i>$row['score']; $i--) {
-                    $colpos = $i + count($user_attributes) - 1;
-                    $sptablesheet->draw_cell_border($row_number + 1, $colpos, 'top', 'thin', 'FF0000');
+                    $col_pos = $i + count($user_attributes);
+                    $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'top', 'thin', 'FF0000');
                 }
             }
             $prev_score = $row['score'];
         }
+        $row_pos += 2;
 
-        // Fill question total score
-        $sptablesheet->write_string($row_number + 3, count($user_attributes) - 1, get_string('rightanswers', 'gradereport_sptable'));
-        $sptablesheet->draw_cell_border($row_number + 3, count($user_attributes), 'left', 'thin', '000000');
-        $sptablesheet->write_string($row_number + 4, count($user_attributes) - 1, get_string('accuracy', 'gradereport_sptable'));
-        $sptablesheet->draw_cell_border($row_number + 4, count($user_attributes), 'left', 'thin', '000000');
+        // Fill question total score headers
+        $col_pos = count($user_attributes);
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('rightanswers', 'gradereport_sptable'));
+        $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'right', 'thin', '000000');
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos + 1, get_string('accuracy', 'gradereport_sptable'));
+        $sptable_sheet->drawCellBorder($col_pos, $row_pos + 1, 'right', 'thin', '000000');
 
-        $col_counter = 0;
+        $col_pos = count($user_attributes) + 1;
         foreach ($q_array as $score) {
-            $colpos = count($user_attributes) + $col_counter;
-
             // Fill user / average score
-            $sptablesheet->write_string($row_number + 3, $colpos, $score);
-            $sptablesheet->write_string($row_number + 4, $colpos, sprintf('%0.2f', $score/count($u_array)));
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, $score);
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos + 1, sprintf('%0.2f', $score/count($u_array)));
 
-            $col_counter++;
+            $col_pos++;
         }
 
-        $colpos = count($user_attributes) + $col_counter + 1;
-        $sptablesheet->write_string($row_number + 3, $colpos, array_sum($q_array));
+        // Fill question total score
+        $col_pos = count($user_attributes) + count($q_array) + 2;
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, array_sum($q_array));
 
-        // Draw problem-score line
-        $prev_score = null;
-        $col_counter = 0;
+        // Draw problem-score line (BLUE)
+        $prev_score = 0;
+        $col_pos = count($user_attributes) + 1;
         foreach ($q_array as $score) {
-            $sptablesheet->draw_cell_border($score, count($user_attributes) + $col_counter, 'bottom', 'dashDot', '0000FF');
-            if (!is_null($prev_score) && $prev_score > $score) {
+            $sptable_sheet->drawCellBorder($col_pos, $score + 1, 'bottom', 'dashDot', '0000FF');
+            if ($prev_score > $score) {
                 for ($i=$prev_score; $i>$score; $i--) {
-                    $sptablesheet->draw_cell_border($i, count($user_attributes) + $col_counter, 'left', 'dashDot', '0000FF');
+                    $sptable_sheet->drawCellBorder($col_pos, $i + 1, 'left', 'dashDot', '0000FF');
                 }
             }
 
-            $col_counter++;
+            $col_pos++;
             $prev_score = $score;
         }
 
-        // Add Student Attention Score (attention_score = (param_a - param_b)/(param_c - param_d * param_e))
-        $colpos = count($user_attributes) + count($q_array) + 3;
+        // Add Student Attention Score (caution_score = (param_a - param_b)/(param_c - param_d * param_e))
+        $col_pos = count($user_attributes) + count($q_array) + 4;
+        $row_pos = 1;
 
-        $sptablesheet->write_string(0, $colpos, get_string('cautionscore', 'gradereport_sptable'));
-        $sptablesheet->draw_cell_border(0, $colpos, 'bottom', 'thin', '000000');
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('cautionscore', 'gradereport_sptable'));
+        $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
 
-        foreach ($sorted_rows as $row_number=>$row) {
+        foreach ($sorted_rows as $row) {
+            $row_pos++;
             $s_position = $row['score'];
 
             $param_a = 0;
@@ -282,18 +314,23 @@ class quiz_overview_sptable extends quiz_overview_table {
                 $counter++;
             }
 
-            $attention_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
-            $attention_score = sprintf('%0.2f', $attention_score);
-            $sptablesheet->write_string($row_number + 1, $colpos, $attention_score);
+            if (($param_c - $param_d*$param_e) > 0) {
+                $caution_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
+            } else {
+                $caution_score = 0;
+            }
+            $caution_score = sprintf('%0.2f', $caution_score);
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, $caution_score);
         }
 
-        // Add Question Attention Score (attention_score = (param_a - param_b)/(param_c - param_d * param_e))
-        $rowpos = count($u_array) + 4;
-        $colpos = count($user_attributes);
-        $sptablesheet->write_string($rowpos, $colpos - 1, get_string('cautionpoint', 'gradereport_sptable'));
-        $sptablesheet->draw_cell_border($rowpos, $colpos, 'left', 'thin', '000000');
+        // Add Problem Attention Score (caution_score = (param_a - param_b)/(param_c - param_d * param_e))
+        $row_pos = count($u_array) + 5;
+        $col_pos = count($user_attributes);
+        $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('cautionpoint', 'gradereport_sptable'));
+        $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'right', 'thin', '000000');
 
         foreach ($q_array as $q_key=>$q_score) {
+            $col_pos++;
             $q_position = $q_score;
 
             $param_a = 0;
@@ -320,18 +357,416 @@ class quiz_overview_sptable extends quiz_overview_table {
             }
             
             if (($param_c - $param_d*$param_e) > 0) {
-                $attention_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
+                $caution_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
             } else {
-                $attention_score = 0;
+                $caution_score = 0;
             }
-            $attention_score = sprintf('%0.2f', $attention_score);
-            $sptablesheet->write_string($rowpos, $colpos, $attention_score);
-            $colpos++;
+            $caution_score = sprintf('%0.2f', $caution_score);
+            $sptable_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, $caution_score);
         }
 
-        // Download Excel file
-        $workbook->close();
-        die();
+        /**
+         * Add Student Scatter Chart 
+         */
+        // Change sheet
+        $sheet_name = 'Scatter_Student';
+        $chart_sheet_s = new \moodle\grade\report\sptable\Spreadsheet\WorkSheet($work_book, $sheet_name);
+        $sheet_id++;
+        $work_book->addSheet($chart_sheet_s, $sheet_id);
+
+        // Create Summary
+        // Add Headers
+        $row_pos = 1;
+        $col_pos = 1;
+        foreach ($user_attributes as $user_attribute) {
+            $chart_sheet_s->setCellValueByColumnAndRow($col_pos, $row_pos, get_string($user_attribute));
+            $chart_sheet_s->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+            $col_pos++;
+        }
+        $chart_sheet_s->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('accuracy', 'gradereport_sptable'));
+        $chart_sheet_s->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+
+        $row_pos = 2;
+        foreach ($sorted_rows as $row) {
+            $col_pos = 1;
+
+            // Print user info
+            $user = core_user::get_user($row['userid']);
+            foreach ($user_attributes as $attribute) {
+                $cell_value = ($attribute === 'fullname') ? fullname($user) : $user->{$attribute};
+                $chart_sheet_s->setCellValueByColumnAndRow($col_pos, $row_pos, $cell_value);
+                $col_pos++;
+            }
+            $chart_sheet_s->drawCellBorder(count($user_attributes), $row_pos, 'right', 'thin', '000000');
+            
+            // Fill user average score
+            $chart_sheet_s->setCellValueByColumnAndRow($col_pos, $row_pos, sprintf('%0.2f', $row['score']/count($q_array)));
+
+            $row_pos++;
+        }
+
+        // Add Student Attention Score (caution_score = (param_a - param_b)/(param_c - param_d * param_e))
+        $col_pos = count($user_attributes) + 2;
+        $row_pos = 1;
+
+        $chart_sheet_s->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('cautionscore', 'gradereport_sptable'));
+        $chart_sheet_s->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+
+        $caution_score_max = 0;
+        foreach ($sorted_rows as $row) {
+            $row_pos++;
+            $s_position = $row['score'];
+
+            $param_a = 0;
+            $param_b = 0;
+            $param_c = 0;
+            $param_d = $row['score'];
+            $param_e = array_sum($q_array) / count($q_array);
+
+            $counter = 0;
+            foreach ($q_array as $q_key=>$q_score) {
+                if ($counter < $s_position && $row['qsgrade'.$q_key] !== 100) {
+                    $param_a += $q_score;
+                }
+
+                if ($counter >= $s_position && $row['qsgrade'.$q_key] === 100) {
+                    $param_b += $q_score;
+                }
+
+                if ($counter < $s_position) {
+                    $param_c += $q_score;
+                }
+
+                $counter++;
+            }
+
+            if (($param_c - $param_d*$param_e) > 0) {
+                $caution_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
+            } else {
+                $caution_score = 0;
+            }
+            $caution_score = sprintf('%0.2f', $caution_score);
+            $chart_sheet_s->setCellValueByColumnAndRow($col_pos, $row_pos, $caution_score);
+
+            $caution_score_max = max($caution_score_max, $caution_score);
+        }
+
+        
+        $col_min = count($user_attributes) + 1;
+        $row_min = 2;   
+        $col_max = $col_min;
+        $row_max = 1 + count($sorted_rows);
+        $range = SpTable::getRangeByColumnAndRow($col_min, $row_min, $col_max, $row_max, $sheet_name);
+        $dataSeriesValues = [
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, $range, Properties::FORMAT_CODE_NUMBER, 5),
+        ];
+        
+        //$dataSeriesValues[0]->getMarkerFillColor()
+        //->setColorProperties('accent1', null, ChartColor::EXCEL_COLOR_TYPE_SCHEME);
+
+        $col_min = 4;
+        $row_min = 2;
+        $col_max = 4;
+        $row_max = 1 + count($sorted_rows);
+        $range = SpTable::getRangeByColumnAndRow($col_min, $row_min, $col_max, $row_max, $sheet_name);
+        $xAxisTickValues = [
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, $range, Properties::FORMAT_CODE_NUMBER, 5),
+        ];
+
+        $trend_line = new TrendLine(TrendLine::TRENDLINE_LINEAR, null, null, true, false);
+        $dataSeriesValues[0]->setTrendLines([$trend_line]);
+        $dataSeriesValues[0]->getTrendLines()[0]->getLineColor()->setColorProperties('accent2', null, ChartColor::EXCEL_COLOR_TYPE_SCHEME);
+        $dataSeriesValues[0]->getTrendLines()[0]->setLineStyleProperties(0.5, null, Properties::LINE_STYLE_DASH_SQUARE_DOT);
+
+
+        $dataSeriesValues[0]->setScatterLines(false);
+
+        $series = new DataSeries(
+            DataSeries::TYPE_SCATTERCHART,
+            null, // plotGrouping
+            range(0, count($dataSeriesValues) - 1), // plotOrder
+            [], // plotLabel
+            $xAxisTickValues, // plotCategory
+            $dataSeriesValues, // plotValues
+            null, // plotDirection
+            false, // smooth line
+            DataSeries::STYLE_LINEMARKER    // plotStyle
+        );
+
+        $layout = new Layout();
+        //$layout->setShowPercent(true);
+        $plotArea = new PlotArea($layout, [$series]);
+               
+        $legend = new Legend(Legend::POSITION_RIGHT, null, false);
+
+        $title = new Title('Scatter Chart by Student');
+
+        $xAxis = new ChartAxis();
+        $xAxis->setAxisType(ChartAxis::AXIS_TYPE_VALUE);
+        $xAxis->setAxisOptionsProperties(
+            Properties::AXIS_LABELS_NEXT_TO,
+            null, // horizontalCrossesValue
+            null, // horizontalCrosses
+            null, // axisOrientation
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            0, // minimum
+            ceil($caution_score_max * 2) / 2, // maximum
+            0.5, // majorUnit
+        );
+
+        $yAxis = new ChartAxis();
+        $yAxis->setAxisOptionsProperties(
+            Properties::AXIS_LABELS_NEXT_TO,
+            null,
+            null,
+            null,
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            0,  // minimum
+            1, // maximum
+            0.25
+        );
+
+        $grid_line = new GridLines();
+        $grid_line->getLineColor()->setColorProperties('c0c0c0', null, ChartColor::EXCEL_COLOR_TYPE_RGB);
+        $grid_line->setLineStyleProperties(0.5, null, Properties::LINE_STYLE_DASH_SQUARE_DOT);
+        $xAxis->setMajorGridlines($grid_line);
+        $yAxis->setMajorGridlines($grid_line);
+
+        $chart_s = new Chart(
+            'chart1', // name
+            $title, // title
+            null, // legend
+            $plotArea, // plotArea
+            true, // plotVisibleOnly
+            DataSeries::EMPTY_AS_GAP, // displayBlanksAs
+            new Title('C.S.'), // xAxisLabel
+            new Title('Accuracy'), // yAxisLabel
+            $xAxis,
+            $yAxis
+        );
+
+        $chart_s->setTopLeftPosition('H3');
+        $chart_s->setBottomRightPosition('P24');
+
+        $chart_sheet_s->addChart($chart_s);
+
+        /**
+         * Add Problem Scatter Chart 
+         */
+        // Change sheet
+        $sheet_name = 'Scatter_Problem';
+        $chart_sheet = new \moodle\grade\report\sptable\Spreadsheet\WorkSheet($work_book, $sheet_name);
+        $sheet_id++;
+        $work_book->addSheet($chart_sheet, $sheet_id);
+
+        // Create Summary
+        // Add Headers
+        $row_pos = 1;
+        $col_pos = 1;
+
+        $chart_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, 'Problem');
+        $chart_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+        $col_pos++;
+
+        $chart_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('accuracy', 'gradereport_sptable'));
+        $chart_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+        $col_pos++;
+
+        $chart_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('cautionscore', 'gradereport_sptable'));
+        $chart_sheet->drawCellBorder($col_pos, $row_pos, 'bottom', 'thin', '000000');
+
+        $row_pos = 2;
+        $col_pos = 1;
+        foreach ($q_array as $q_key=>$q_score) {
+            // Add Question No.
+            $chart_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, 'Q'.$q_key);
+
+            // Add Accuracy
+            $chart_sheet->setCellValueByColumnAndRow($col_pos + 1, $row_pos, sprintf('%.2f', $q_score / count($u_array)));
+
+            $q_position = $q_score;
+            $param_a = 0;
+            $param_b = 0;
+            $param_c = 0;
+            $param_d = $q_score;
+            $param_e = array_sum($q_array) / count($u_array);
+
+            $counter = 0;
+            foreach ($sorted_rows as $row) {
+                if ($counter < $q_position && $row['qsgrade'.$q_key] !== 100) {
+                    $param_a += $row['score'];
+                }
+
+                if ($counter >= $q_position && $row['qsgrade'.$q_key] === 100) {
+                    $param_b += $row['score'];
+                }
+
+                if ($counter < $q_position) {
+                    $param_c += $row['score'];
+                }
+
+                $counter++;
+            }
+            
+            if (($param_c - $param_d*$param_e) > 0) {
+                $caution_score = @(($param_a - $param_b) / ($param_c - $param_d*$param_e));
+            } else {
+                $caution_score = 0;
+            }
+            $caution_score = sprintf('%0.2f', $caution_score);
+            $chart_sheet->setCellValueByColumnAndRow($col_pos + 2, $row_pos, $caution_score);
+
+            $sptable_sheet->drawCellBorder($col_pos, $row_pos, 'right', 'thin', '000000');
+            
+            $row_pos++;
+        }
+
+        $col_min = 2;
+        $row_min = 2;
+        $col_max = 2;
+        $row_max = 1 + count($sorted_rows);
+        $range = SpTable::getRangeByColumnAndRow($col_min, $row_min, $col_max, $row_max, $sheet_name);
+        $dataSeriesValues = [
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, $range, Properties::FORMAT_CODE_NUMBER, 5),
+        ];
+        
+        //$dataSeriesValues[0]->getMarkerFillColor()
+        //->setColorProperties('accent1', null, ChartColor::EXCEL_COLOR_TYPE_SCHEME);
+
+        $col_min = 3;
+        $row_min = 2;
+        $col_max = 3;
+        $row_max = 1 + count($sorted_rows);
+        $range = SpTable::getRangeByColumnAndRow($col_min, $row_min, $col_max, $row_max, $sheet_name);
+        $xAxisTickValues = [
+            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, $range, Properties::FORMAT_CODE_NUMBER, 5),
+        ];
+
+        $trend_line = new TrendLine(TrendLine::TRENDLINE_LINEAR, null, null, true, false);
+        $dataSeriesValues[0]->setTrendLines([$trend_line]);
+        $dataSeriesValues[0]->getTrendLines()[0]->getLineColor()->setColorProperties('accent2', null, ChartColor::EXCEL_COLOR_TYPE_SCHEME);
+        $dataSeriesValues[0]->getTrendLines()[0]->setLineStyleProperties(0.5, null, Properties::LINE_STYLE_DASH_SQUARE_DOT);
+
+
+        $dataSeriesValues[0]->setScatterLines(false);
+
+        $series = new DataSeries(
+            DataSeries::TYPE_SCATTERCHART,
+            null, // plotGrouping
+            range(0, count($dataSeriesValues) - 1), // plotOrder
+            [], // plotLabel
+            $xAxisTickValues, // plotCategory
+            $dataSeriesValues, // plotValues
+            null, // plotDirection
+            false, // smooth line
+            DataSeries::STYLE_LINEMARKER    // plotStyle
+        );
+
+        $layout = new Layout();
+        //$layout->setShowPercent(true);
+        $plotArea = new PlotArea($layout, [$series]);
+               
+        $legend = new Legend(Legend::POSITION_RIGHT, null, false);
+
+        $title = new Title('Scatter Chart by Student');
+
+        $xAxis = new ChartAxis();
+        $xAxis->setAxisType(ChartAxis::AXIS_TYPE_VALUE);
+        $xAxis->setAxisOptionsProperties(
+            Properties::AXIS_LABELS_NEXT_TO,
+            null, // horizontalCrossesValue
+            null, // horizontalCrosses
+            null, // axisOrientation
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            0, // minimum
+            ceil($caution_score_max * 2) / 2, // maximum
+            0.5, // majorUnit
+        );
+
+        $yAxis = new ChartAxis();
+        $yAxis->setAxisOptionsProperties(
+            Properties::AXIS_LABELS_NEXT_TO,
+            null,
+            null,
+            null,
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            Properties::TICK_MARK_OUTSIDE, // minorTmt
+            0,  // minimum
+            1, // maximum
+            0.25
+        );
+
+        $grid_line = new GridLines();
+        $grid_line->getLineColor()->setColorProperties('c0c0c0', null, ChartColor::EXCEL_COLOR_TYPE_RGB);
+        $grid_line->setLineStyleProperties(0.5, null, Properties::LINE_STYLE_DASH_SQUARE_DOT);
+        $xAxis->setMajorGridlines($grid_line);
+        $yAxis->setMajorGridlines($grid_line);
+
+        $chart = new Chart(
+            'chart1', // name
+            $title, // title
+            null, // legend
+            $plotArea, // plotArea
+            true, // plotVisibleOnly
+            DataSeries::EMPTY_AS_GAP, // displayBlanksAs
+            new Title('C.S.'), // xAxisLabel
+            new Title('Accuracy'), // yAxisLabel
+            $xAxis,
+            $yAxis
+        );
+
+        $chart->setTopLeftPosition('H3');
+        $chart->setBottomRightPosition('P24');
+
+        $chart_sheet->addChart($chart);
+
+        /**
+         * Add Analytics 
+         */
+        // Change sheet
+        $analytics_sheet = new \moodle\grade\report\sptable\Spreadsheet\WorkSheet($work_book, 'Analytics');
+        $sheet_id++;
+        $work_book->addSheet($analytics_sheet, $sheet_id);
+
+        $col_pos = 1;
+        $row_pos = 1;
+
+        try {
+            $dc = new DefereceCoefficient($u_array, $q_array);
+            $dc_data = $dc->getDetail();
+
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('numberstudent', 'gradereport_sptable'));
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos+1, $row_pos, $dc_data['number_student']);
+            $row_pos++;
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('numberquestion', 'gradereport_sptable'));
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos+1, $row_pos, $dc_data['number_question']);
+            $row_pos++;
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('answerrate', 'gradereport_sptable'));
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos+1, $row_pos, $dc_data['anwer_rate']);
+            $row_pos++;
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('mindex', 'gradereport_sptable'));
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos+1, $row_pos, $dc_data['m_index']);
+            $row_pos++;
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('dbm', 'gradereport_sptable'));
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos+1, $row_pos, $dc_data['dbm']);
+            $row_pos++;
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('dc', 'gradereport_sptable'));
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos+1, $row_pos, $dc_data['dc']);
+
+        } catch (Exception $e) {
+            $analytics_sheet->setCellValueByColumnAndRow($col_pos, $row_pos, get_string('dcexception', 'gradereport_sptable'));
+        }
+
+
+        /**
+         * Download Excel file
+         */ 
+        // Export
+        $filename = 'sptable_' . strip_tags($this->quiz->name).'.xlsx';
+        $this->_export_excel($work_book, 'sptable-'.date("Y-m-d_His").'.xlsx');
     }
 
 
@@ -385,5 +820,18 @@ class quiz_overview_sptable extends quiz_overview_table {
         }
 
         return $grade;
+    }
+
+    private function _export_excel(\PhpOffice\PhpSpreadsheet\Spreadsheet $work_book, string $file_name)
+    {
+        $file_name = addslashes($file_name);
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="'.$file_name.'"');    // $filename
+        header('Cache-Control: max-age=0');
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($work_book);
+        $writer->setIncludeCharts(true);
+        $writer->save('php://output');
+        die();
     }
 }
