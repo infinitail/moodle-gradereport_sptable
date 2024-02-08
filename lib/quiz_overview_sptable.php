@@ -670,7 +670,7 @@ class quiz_overview_sptable extends quiz_overview_table {
                
         $legend = new Legend(Legend::POSITION_RIGHT, null, false);
 
-        $title = new Title('Scatter Chart by Student');
+        $title = new Title('Scatter Chart by Problem');
 
         $xAxis = new ChartAxis();
         $xAxis->setAxisType(ChartAxis::AXIS_TYPE_VALUE);
@@ -712,7 +712,7 @@ class quiz_overview_sptable extends quiz_overview_table {
             $plotArea, // plotArea
             true, // plotVisibleOnly
             DataSeries::EMPTY_AS_GAP, // displayBlanksAs
-            new Title('C.S.'), // xAxisLabel
+            new Title('C.P.'), // xAxisLabel
             new Title('Accuracy'), // yAxisLabel
             $xAxis,
             $yAxis
